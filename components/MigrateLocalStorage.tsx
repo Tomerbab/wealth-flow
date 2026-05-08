@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { DatabaseZap, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
-import { supabase, USER_ID } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient'
 import type { FinanceData, Category, CategoryType, MonthlyEntry } from '@/types'
 
 const STORAGE_KEY = 'wealthflow_data'
@@ -40,7 +40,7 @@ function readLocalStorage(): FinanceData | null {
   }
 }
 
-export default function MigrateLocalStorage({ onMigrated }: { onMigrated: () => void }) {
+export default function MigrateLocalStorage({ onMigrated, userId }: { onMigrated: () => void; userId: string }) {
   const [status, setStatus]   = useState<Status>('idle')
   const [message, setMessage] = useState('')
   const [stats, setStats]     = useState({ cats: 0, entries: 0 })
@@ -66,7 +66,7 @@ export default function MigrateLocalStorage({ onMigrated }: { onMigrated: () => 
       setMessage(`מעלה ${local.categories.length} קטגוריות...`)
       const catRows = local.categories.map((cat, i) => ({
         id:         cat.id,
-        user_id:    USER_ID,
+        user_id:    userId,
         name:       cat.name,
         color:      cat.color,
         type:       cat.type,
@@ -82,7 +82,7 @@ export default function MigrateLocalStorage({ onMigrated }: { onMigrated: () => 
       // ── 2. Upsert monthly entries ─────────────────────────────────
       setMessage(`מעלה ${local.entries.length} רשומות חודשיות...`)
       const entryRows = local.entries.map((e) => ({
-        user_id:  USER_ID,
+        user_id:  userId,
         month:    e.month,
         balances: e.balances,
         incomes:  e.incomes,
