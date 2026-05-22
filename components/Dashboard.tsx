@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { LayoutGrid, CirclePlus, TrendingUp, Settings, BarChart2, LogOut } from 'lucide-react'
+import { LayoutGrid, CirclePlus, TrendingUp, Settings, BarChart2, LogOut, Eye, EyeOff } from 'lucide-react'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { supabase } from '@/lib/supabaseClient'
 import StatCard from '@/components/StatCard'
@@ -29,9 +29,17 @@ const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ size?: number 
 ]
 
 export default function Dashboard({ userId, userEmail }: Props) {
-  const [activeTab, setActiveTab]       = useState<Tab>('dashboard')
+  const [activeTab, setActiveTab]           = useState<Tab>('dashboard')
   const [drilldownCatId, setDrilldownCatId] = useState<string | null>(null)
+  const [hiddenAssets, setHiddenAssets]     = useState<Set<string>>(new Set())
   const finance = useFinanceData(userId)
+
+  const toggleAsset = (id: string) =>
+    setHiddenAssets((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
 
   const handleLogout  = () => supabase.auth.signOut()
   const handleMigrated = () => finance.refresh()
@@ -49,15 +57,17 @@ export default function Dashboard({ userId, userEmail }: Props) {
     )
   }
 
-  const assetCats   = finance.data.categories.filter((c) => c.type === 'asset')
-  const incomeCats  = finance.data.categories.filter((c) => c.type === 'income')
-  const expenseCats = finance.data.categories.filter((c) => c.type === 'expense')
+  const assetCats        = finance.data.categories.filter((c) => c.type === 'asset')
+  const incomeCats       = finance.data.categories.filter((c) => c.type === 'income')
+  const expenseCats      = finance.data.categories.filter((c) => c.type === 'expense')
+  const visibleAssetCats = assetCats.filter((c) => !hiddenAssets.has(c.id))
 
   const latestEntry   = finance.getLatestEntry()
   const previousEntry = finance.getPreviousEntry()
 
-  const latestTotal   = latestEntry   ? assetCats.reduce((s, c) => s + (latestEntry.balances[c.id]   ?? 0), 0) : 0
-  const previousTotal = previousEntry ? assetCats.reduce((s, c) => s + (previousEntry.balances[c.id] ?? 0), 0) : 0
+  const allAssetsTotal = latestEntry   ? assetCats.reduce((s, c) => s + (latestEntry.balances[c.id]   ?? 0), 0) : 0
+  const latestTotal    = latestEntry   ? visibleAssetCats.reduce((s, c) => s + (latestEntry.balances[c.id]   ?? 0), 0) : 0
+  const previousTotal  = previousEntry ? visibleAssetCats.reduce((s, c) => s + (previousEntry.balances[c.id] ?? 0), 0) : 0
   const monthlyChange    = latestTotal - previousTotal
   const monthlyChangePct = previousTotal > 0 ? (monthlyChange / previousTotal) * 100 : 0
 
@@ -176,8 +186,8 @@ export default function Dashboard({ userId, userEmail }: Props) {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <AllocationChart categories={assetCats} latestEntry={latestEntry} />
-              <WealthChart     categories={assetCats} entries={finance.data.entries} />
+              <AllocationChart categories={visibleAssetCats} latestEntry={latestEntry} />
+              <WealthChart     categories={visibleAssetCats} entries={finance.data.entries} />
             </div>
 
             {latestEntry && finance.data.categories.length > 0 && (
@@ -190,13 +200,20 @@ export default function Dashboard({ userId, userEmail }: Props) {
                 {assetCats.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
                     {assetCats.map((cat) => {
-                      const balance = latestEntry.balances[cat.id] ?? 0
-                      const pct = latestTotal > 0 ? ((balance / latestTotal) * 100).toFixed(1) : '0'
+                      const balance    = latestEntry.balances[cat.id] ?? 0
+                      const pct        = allAssetsTotal > 0 ? ((balance / allAssetsTotal) * 100).toFixed(1) : '0'
+                      const isHidden   = hiddenAssets.has(cat.id)
+
+                      const prevBalance  = previousEntry?.balances[cat.id]
+                      const hasTrend     = prevBalance !== undefined && prevBalance > 0
+                      const trendDelta   = hasTrend ? balance - (prevBalance as number) : null
+                      const trendPct     = hasTrend && trendDelta !== null ? (trendDelta / (prevBalance as number)) * 100 : null
+
                       return (
                         <button
                           key={cat.id}
                           onClick={() => setDrilldownCatId(cat.id)}
-                          className="flex items-center justify-between bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/40 hover:border-slate-600 hover:bg-slate-800 transition-all text-right group"
+                          className={`flex items-center justify-between bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/40 hover:border-slate-600 hover:bg-slate-800 transition-all text-right group ${isHidden ? 'opacity-40' : ''}`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
@@ -205,9 +222,23 @@ export default function Dashboard({ userId, userEmail }: Props) {
                               <p className="text-slate-600 text-xs">{pct}%</p>
                             </div>
                           </div>
-                          <span className="text-white text-sm font-semibold tabular-nums ms-2 flex-shrink-0">
-                            {formatCurrency(balance)}
-                          </span>
+                          <div className="flex items-center gap-2 ms-2 flex-shrink-0">
+                            {trendDelta !== null && trendPct !== null && (
+                              <span className={`text-xs tabular-nums ${trendDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {trendDelta >= 0 ? '↑' : '↓'}{Math.abs(trendPct).toFixed(1)}%
+                              </span>
+                            )}
+                            <span className="text-white text-sm font-semibold tabular-nums">
+                              {formatCurrency(balance)}
+                            </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleAsset(cat.id) }}
+                              className="text-slate-500 hover:text-slate-300 p-0.5 rounded transition-colors"
+                              title={isHidden ? 'הצג נכס' : 'הסתר נכס'}
+                            >
+                              {isHidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                            </button>
+                          </div>
                         </button>
                       )
                     })}

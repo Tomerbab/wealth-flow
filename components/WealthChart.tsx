@@ -29,12 +29,12 @@ export default function WealthChart({ categories, entries }: Props) {
   const chartData = entries.map((entry) => {
     // Sum only known categories to avoid counting orphaned JSONB keys
     const total = categories.reduce((s, cat) => s + (entry.balances[cat.id] ?? 0), 0)
-    const point: Record<string, string | number> = {
+    const point: Record<string, string | number | null> = {
       month: formatMonth(entry.month, true),
       total,
     }
     categories.forEach((cat) => {
-      point[cat.id] = entry.balances[cat.id] ?? 0
+      point[cat.id] = entry.balances[cat.id] ?? null
     })
     return point
   })
@@ -96,6 +96,7 @@ export default function WealthChart({ categories, entries }: Props) {
                 dot={false}
                 strokeDasharray="5 3"
                 activeDot={{ r: 3, fill: cat.color }}
+                connectNulls={true}
               />
             ))}
           </LineChart>
