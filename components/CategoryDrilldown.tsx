@@ -49,6 +49,7 @@ export default function CategoryDrilldown({ category, entries, fees, onBack }: P
   }))
 
   const feeEntries = Object.entries(fees)
+  const parsePct = (val: string) => { const n = parseFloat(val.replace('%', '')); return isNaN(n) ? 0 : n }
 
   return (
     <div className="space-y-5">
@@ -260,15 +261,26 @@ export default function CategoryDrilldown({ category, entries, fees, onBack }: P
           </p>
         ) : (
           <div className="space-y-2">
-            {feeEntries.map(([label, value]) => (
-              <div
-                key={label}
-                className="flex items-center justify-between py-2.5 px-4 bg-amber-950/10 border border-amber-900/30 rounded-lg"
-              >
-                <span className="text-slate-300 text-sm">{label}</span>
-                <span className="text-amber-400 text-sm font-semibold tabular-nums">{value}</span>
-              </div>
-            ))}
+            {feeEntries.map(([label, value]) => {
+              const monthlyCost = latestBalance * parsePct(value) / 100 / 12
+              return (
+                <div
+                  key={label}
+                  className="flex items-center justify-between py-2.5 px-4 bg-amber-950/10 border border-amber-900/30 rounded-lg"
+                >
+                  <span className="text-slate-300 text-sm">{label}</span>
+                  <div className="flex items-center gap-4">
+                    {monthlyCost > 0 && (
+                      <div className="text-right">
+                        <p className="text-slate-500 text-xs">עלות חודשית נגזרת</p>
+                        <p className="text-amber-300/70 text-xs font-medium tabular-nums">~{formatCurrency(monthlyCost)}</p>
+                      </div>
+                    )}
+                    <span className="text-amber-400 text-sm font-semibold tabular-nums">{value}</span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

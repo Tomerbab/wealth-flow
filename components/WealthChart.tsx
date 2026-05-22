@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   LineChart,
   Line,
@@ -17,7 +18,13 @@ interface Props {
   entries: MonthlyEntry[]
 }
 
+const RANGES = ['3M', '6M', '1Y', 'הכל'] as const
+type Range = typeof RANGES[number]
+const RANGE_MONTHS: Record<Range, number | null> = { '3M': 3, '6M': 6, '1Y': 12, 'הכל': null }
+
 export default function WealthChart({ categories, entries }: Props) {
+  const [range, setRange] = useState<Range>('הכל')
+
   if (entries.length === 0) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col items-center justify-center h-72">
@@ -26,7 +33,10 @@ export default function WealthChart({ categories, entries }: Props) {
     )
   }
 
-  const chartData = entries.map((entry) => {
+  const count = RANGE_MONTHS[range]
+  const visibleEntries = count !== null ? entries.slice(-count) : entries
+
+  const chartData = visibleEntries.map((entry) => {
     // Sum only known categories to avoid counting orphaned JSONB keys
     const total = categories.reduce((s, cat) => s + (entry.balances[cat.id] ?? 0), 0)
     const point: Record<string, string | number | null> = {
@@ -41,7 +51,24 @@ export default function WealthChart({ categories, entries }: Props) {
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-      <h3 className="text-white font-semibold text-sm">מגמת הון לאורך זמן</h3>
+      <div className="flex items-center justify-between mb-0.5">
+        <h3 className="text-white font-semibold text-sm">מגמת הון לאורך זמן</h3>
+        <div className="flex gap-1">
+          {RANGES.map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`text-xs px-2 py-0.5 rounded transition-colors ${
+                range === r
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      </div>
       <p className="text-slate-500 text-xs mt-0.5 mb-3">סה"כ ופירוט לפי קטגוריה</p>
       <div dir="ltr">
         <ResponsiveContainer width="100%" height={255}>

@@ -77,6 +77,16 @@ export default function Dashboard({ userId, userEmail }: Props) {
 
   const isBaselineOnly = finance.data.entries.length === 1
 
+  const parsePct = (val: string) => { const n = parseFloat(val.replace('%', '')); return isNaN(n) ? 0 : n }
+  const annualFeeRunRate = latestEntry
+    ? assetCats.reduce((sum, cat) => {
+        const balance = latestEntry.balances[cat.id] ?? 0
+        const catFees = finance.data.fees[cat.id] ?? {}
+        return sum + Object.values(catFees).reduce((s, v) => s + balance * parsePct(v) / 100, 0)
+      }, 0)
+    : 0
+  const hasFees = Object.values(finance.data.fees).some((f) => Object.keys(f).length > 0)
+
   return (
     <div className="min-h-screen bg-slate-950">
 
@@ -269,6 +279,17 @@ export default function Dashboard({ userId, userEmail }: Props) {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {hasFees && latestEntry && annualFeeRunRate > 0 && (
+              <div className="border border-slate-800/60 rounded-xl px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-slate-400 text-xs">סה&quot;כ קצב עמלות שנתי משוער</span>
+                  <span className="text-slate-700 text-xs hidden sm:inline">·</span>
+                  <span className="text-slate-600 text-xs hidden sm:inline">על בסיס יתרות אחרונות</span>
+                </div>
+                <span className="text-amber-400 text-sm font-semibold tabular-nums flex-shrink-0">~{formatCurrency(annualFeeRunRate)}</span>
               </div>
             )}
 
